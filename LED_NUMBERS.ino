@@ -6,7 +6,7 @@
 #define NUM_LEDS_IN_7 ( 10 )
 
 #define LED_CONTROL_PIN 3
-#define PATTERN_CHANGE_PIN 3
+#define PATTERN_CHANGE_PIN 2
 
 CRGB leds[NUM_LEDS];
 
@@ -16,6 +16,8 @@ void DotChase(void);
 void Meter(void);
 void Chant(void);
 void RainbowFull(void);
+void RainbowChase(void);
+void ColorPick(void);
 
 
 void ( *PatternFunctions[] )( void ) = {
@@ -23,11 +25,13 @@ void ( *PatternFunctions[] )( void ) = {
   DotChase,
   Meter,
   Chant,
-  RainbowFull
+  RainbowFull,
+  RainbowChase,
+  ColorPick
 };
 uint8_t numPatterns = sizeof( PatternFunctions ) / sizeof( PatternFunctions[0] );
 
-CRGB GoldColor = CRGB(0x00, 0xFF, 0xDF);
+CRGB GoldColor = CRGB(0xFF, 0xDF, 0x00);
 CRGB ColorA = CRGB::White;
 CRGB ColorB = GoldColor;
 
@@ -40,9 +44,13 @@ uint32_t patternHoldCount = 0;
 
 // This function sets up the ledsand tells the controller about them
 void setup() {
+    pinMode(PATTERN_CHANGE_PIN, INPUT);
+    Serial.begin(9600);//begin serial feedback on usb port
     // sanity check delay - allows reprogramming if accidently blowing power w/leds
+    Serial.println("wait...");
     delay(2000);
-    FastLED.addLeds<UCS1903, LED_CONTROL_PIN, RGB>(leds, NUM_LEDS);           // <- this part
+    Serial.println("Starting");
+    FastLED.addLeds<UCS1903, LED_CONTROL_PIN, BRG>(leds, NUM_LEDS);           // <- this part
 }
 
 
@@ -53,6 +61,8 @@ void loop() {
     if ( buttonCount == 2 )
     {
       patternId++;
+      Serial.print("patternId update: ");
+      Serial.println(patternId);
       patternId %= numPatterns;
       patternHoldCount = 0;
     }
@@ -302,4 +312,34 @@ void RainbowFull(void)
    }
    
    currentHue++;
+}
+
+void RainbowChase(void)
+{
+   static uint8_t stepcount = 0;
+   uint16_t delayAfterShow = analogRead( A0 );
+
+   if ( patternHoldCount < (delayAfterShow / 10) )
+   {
+      return;
+   }
+   else
+   {
+      patternHoldCount = 0;
+      stepcount++;
+   }
+   
+   for(int ledbank = 0; ledbank < NUM_LEDS; ledbank = ledbank + 1) 
+   {
+    leds[ledbank].setHSV( ledbank+stepcount, 255, 255 );
+   }
+}
+
+void ColorPick(void)
+{
+   uint16_t colorHue = map(analogRead(A0),0,1023,0,255);
+   for(int ledbank = 0; ledbank < NUM_LEDS; ledbank = ledbank + 1) 
+   {
+    leds[ledbank].setHSV( colorHue, 255, 255 );
+   }
 }
