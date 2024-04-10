@@ -1,12 +1,14 @@
 #include <FastLED.h>    // if not found, get it here http://fastled.io/
 
-
+#define DEFAULT_ID 8
 #define NUM_LEDS 64
 #define NUM_LEDS_IN_2 ( 18 )
 #define NUM_LEDS_IN_7 ( 10 )
 
 #define LED_CONTROL_PIN 3
 #define PATTERN_CHANGE_PIN 2
+
+#define NUMDROPS 20
 
 CRGB leds[NUM_LEDS];
 
@@ -18,6 +20,8 @@ void Chant(void);
 void RainbowFull(void);
 void RainbowChase(void);
 void ColorPick(void);
+void ColorSplash(void);
+void NumBounce(void);
 
 
 void ( *PatternFunctions[] )( void ) = {
@@ -27,7 +31,9 @@ void ( *PatternFunctions[] )( void ) = {
   Chant,
   RainbowFull,
   RainbowChase,
-  ColorPick
+  ColorPick,
+  ColorSplash,
+  NumBounce
 };
 uint8_t numPatterns = sizeof( PatternFunctions ) / sizeof( PatternFunctions[0] );
 
@@ -35,7 +41,7 @@ CRGB GoldColor = CRGB(0xFF, 0xDF, 0x00);
 CRGB ColorA = CRGB::White;
 CRGB ColorB = GoldColor;
 
-uint8_t  patternId = 0;
+uint8_t  patternId = DEFAULT_ID;
 uint16_t buttonCount = 0;
 
 
@@ -51,6 +57,7 @@ void setup() {
     delay(2000);
     Serial.println("Starting");
     FastLED.addLeds<UCS1903, LED_CONTROL_PIN, BRG>(leds, NUM_LEDS);           // <- this part
+    randomSeed(analogRead(A1));
 }
 
 
@@ -61,9 +68,12 @@ void loop() {
     if ( buttonCount == 2 )
     {
       patternId++;
+      patternId %= numPatterns;
+
+
       Serial.print("patternId update: ");
       Serial.println(patternId);
-      patternId %= numPatterns;
+
       patternHoldCount = 0;
     }
     
@@ -342,4 +352,140 @@ void ColorPick(void)
    {
     leds[ledbank].setHSV( colorHue, 255, 255 );
    }
+}
+
+void ColorSplash(void)
+{
+   uint16_t delayAfterShow = analogRead( A0 );
+
+  if ( patternHoldCount < (delayAfterShow / 10) )
+  {
+     return;
+  }
+  else
+  {
+    patternHoldCount = 0;
+  }
+
+
+  static uint16_t step = 1;
+  static bool newsplash = true;
+  static uint16_t splashtrack [NUMDROPS];
+  uint16_t numsplash = analogRead(A0)/10;
+  static uint16_t colorHue = random(255);
+
+  if(newsplash==true){
+    colorHue = random(255);
+    for (int drops = 0; drops < NUMDROPS; drops = drops + 1)
+    {
+      splashtrack[drops] = random(NUM_LEDS);
+      newsplash=false;
+    }
+  }
+  bool showthis=false;
+  if(newsplash==false)
+  {
+    for(int ledbank = 0; ledbank < NUM_LEDS; ledbank = ledbank + 1) 
+    {
+      for(int i=0; i<NUMDROPS; i = i + 1)
+      {
+        if(step==1)
+        {
+          if(splashtrack[i]==ledbank) showthis=true;
+        }
+        if(step==2)
+        {
+          if((splashtrack[i]-1==ledbank)||(splashtrack[i]+1==ledbank)||(splashtrack[i]==ledbank)) showthis=true;
+        }
+        if(step==3)
+        {
+          if((splashtrack[i]-2==ledbank)||(splashtrack[i]+2==ledbank)||(splashtrack[i]-1==ledbank)||(splashtrack[i]+1==ledbank)||(splashtrack[i]==ledbank)) showthis=true;
+        }
+       
+      }
+      if(showthis){
+        leds[ledbank].setHSV( colorHue, 255, 255 );
+        showthis=false;
+      }
+      else{
+        leds[ledbank] = CRGB::Black;
+      }
+
+    }
+  }
+    step++;
+    if(step==4)
+      {
+      step=1;
+      newsplash=true;
+     }
+}
+
+
+void NumBounce(void)
+{
+  static int stepsgn = -1;
+  uint16_t delayAfterShow = analogRead( A0 );
+  if ( patternHoldCount < (delayAfterShow / 10) )
+  {
+     return;
+  }
+  else
+  {
+    patternHoldCount = 0;
+  }
+  static uint16_t dispnum = 1;
+  static uint16_t colorHue = random(255);
+  if (dispnum == 1)
+  {
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+    leds[ledstep] = CRGB::Black;
+    }
+    colorHue = random(255);
+    stepsgn=0-stepsgn;
+  } 
+  if (dispnum == 2)
+  {
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+      if ( ledstep < NUM_LEDS_IN_7 ) leds[ledstep].setHSV( colorHue, 255, 255 );
+      else leds[ledstep] = CRGB::Black;
+    }
+  }
+  if (dispnum == 3)
+  {
+
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+      if ( (ledstep > NUM_LEDS_IN_7) && (ledstep<NUM_LEDS_IN_7+NUM_LEDS_IN_2) ) leds[ledstep].setHSV( colorHue, 255, 255 );
+      else leds[ledstep] = CRGB::Black;
+    }
+  }
+  if (dispnum == 4)
+  {
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+      if ( (ledstep > NUM_LEDS_IN_7+NUM_LEDS_IN_2) && (ledstep<NUM_LEDS_IN_7+NUM_LEDS_IN_2*2) ) leds[ledstep].setHSV( colorHue, 255, 255 );
+      else leds[ledstep] = CRGB::Black;
+    } 
+  }
+  if (dispnum == 5)
+  {
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+      if ( (ledstep > NUM_LEDS_IN_7+NUM_LEDS_IN_2*2) && (ledstep<NUM_LEDS_IN_7+NUM_LEDS_IN_2*3) ) leds[ledstep].setHSV( colorHue, 255, 255 );
+      else leds[ledstep] = CRGB::Black;
+    }
+  }
+  if (dispnum == 6)
+  {
+    for(int ledstep = 0; ledstep < NUM_LEDS; ledstep++) 
+    {
+    leds[ledstep] = CRGB::Black;
+    }
+    colorHue = random(255);
+    stepsgn=0-stepsgn;
+  }
+  dispnum+=stepsgn;
 }
